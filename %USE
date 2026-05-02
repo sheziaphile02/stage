@@ -1,0 +1,883 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+
+const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+3:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');`;
+
+const css = `
+${FONTS}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a12;
+  --surface: #12121e;
+  --surface2: #1a1a28;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --gold: #e8b84b;
+  --gold2: #f5d080;
+  --cyan: #4dd9e8;
+  --text: #e8e8f2;
+  --muted: rgba(255,255,255,0.35);
+  --faint: rgba(255,255,255,0.1);
+  --font-display: 'Playfair Display', serif;
+  --font-body: 'Source Sans 3', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body { background: var(--bg); overflow: hidden; }
+
+.app {
+  width: 100vw; height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  display: flex; flex-direction: column;
+  overflow: hidden; user-select: none;
+}
+
+/* ── HEADER ─────────────────────────────────────── */
+.header {
+  height: 56px; min-height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 24px; gap: 24px; z-index: 100;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: 22px; font-weight: 700;
+  color: var(--gold); letter-spacing: 5px;
+  text-transform: uppercase; white-space: nowrap;
+}
+
+.tabs { display: flex; gap: 2px; flex: 1; }
+
+.tab {
+  padding: 7px 18px; border-radius: 6px; border: none; cursor: pointer;
+  font-family: var(--font-body); font-size: 13px; font-weight: 500;
+  background: transparent; color: var(--muted);
+  transition: all 0.18s; letter-spacing: 0.3px;
+}
+.tab:hover { color: var(--text); background: var(--faint); }
+.tab.active {
+  background: rgba(232,184,75,0.12);
+  color: var(--gold);
+  border: 1px solid rgba(232,184,75,0.25);
+}
+
+.header-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 7px;
+  border: 1px solid var(--border2); background: var(--surface2);
+  color: var(--muted); cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.icon-btn:hover { color: var(--text); border-color: rgba(232,184,75,0.3); }
+
+/* ── SHARED LAYOUT ───────────────────────────────── */
+.content { flex: 1; display: flex; overflow: hidden; }
+
+.left-panel {
+  width: 280px; min-width: 280px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.right-panel {
+  width: 280px; min-width: 280px;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.stage { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+.panel-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-section:last-child { border-bottom: none; flex: 1; }
+
+.section-label {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px; font-family: var(--font-mono);
+}
+
+/* ── DISPLAY STAGE ───────────────────────────────── */
+.display-area {
+  flex: 1; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: #060610;
+}
+
+.display-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  transition: opacity 0.4s;
+}
+.display-bg-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.55);
+}
+
+.display-content {
+  position: relative; z-index: 2;
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 60px 80px; text-align: center;
+}
+
+.stage-controls-bar {
+  height: 52px; min-height: 52px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 20px; gap: 10px;
+}
+
+/* ── INPUTS ─────────────────────────────────────── */
+.inp {
+  width: 100%; padding: 8px 10px; border-radius: 7px;
+  border: 1px solid var(--border2); background: rgba(255,255,255,0.04);
+  color: var(--text); font-family: var(--font-body); font-size: 13px;
+  outline: none; transition: border-color 0.2s;
+}
+.inp:focus { border-color: rgba(232,184,75,0.45); }
+.inp::placeholder { color: var(--muted); }
+
+textarea.inp { resize: none; line-height: 1.65; }
+
+.btn {
+  padding: 8px 16px; border-radius: 7px; border: 1px solid var(--border2);
+  background: var(--surface2); color: var(--text); cursor: pointer;
+  font-family: var(--font-body); font-size: 13px; font-weight: 500;
+  transition: all 0.15s; white-space: nowrap;
+}
+.btn:hover { border-color: var(--border2); background: rgba(255,255,255,0.08); }
+.btn.gold {
+  background: rgba(232,184,75,0.12); border-color: rgba(232,184,75,0.35); color: var(--gold);
+}
+.btn.gold:hover { background: rgba(232,184,75,0.2); }
+.btn.danger { background: rgba(255,80,80,0.1); border-color: rgba(255,80,80,0.3); color: #ff8080; }
+.btn.full { width: 100%; justify-content: center; }
+.btn.large {
+  padding: 11px 20px; font-size: 14px; font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.btn-row { display: flex; gap: 6px; }
+
+/* ── SLIDE LIST ─────────────────────────────────── */
+.slide-list { flex: 1; overflow-y: auto; padding: 12px; }
+.slide-list::-webkit-scrollbar { width: 4px; }
+.slide-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+.slide-item {
+  padding: 10px 12px; border-radius: 8px; margin-bottom: 6px;
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all 0.15s; background: rgba(255,255,255,0.02);
+}
+.slide-item:hover { border-color: rgba(232,184,75,0.25); background: rgba(232,184,75,0.04); }
+.slide-item.active { border-color: var(--gold); background: rgba(232,184,75,0.08); }
+.slide-item-num { font-size: 10px; color: var(--muted); font-family: var(--font-mono); margin-bottom: 3px; }
+.slide-item-title { font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slide-item-preview { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+
+/* ── PRESENTATION DISPLAY ───────────────────────── */
+.slide-title-out {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 5vw, 72px);
+  font-weight: 700; color: #fff; margin-bottom: 24px;
+  line-height: 1.15; text-shadow: 0 2px 40px rgba(0,0,0,0.8);
+}
+.slide-body-out {
+  font-size: clamp(14px, 1.8vw, 22px);
+  line-height: 1.85; color: rgba(255,255,255,0.8);
+  max-width: 800px; white-space: pre-wrap;
+  text-shadow: 0 1px 20px rgba(0,0,0,0.7);
+}
+.slide-badge {
+  position: absolute; bottom: 20px; right: 24px;
+  font-family: var(--font-mono); font-size: 11px; color: rgba(255,255,255,0.2);
+}
+.slide-gold-line {
+  width: 60px; height: 3px; background: var(--gold);
+  margin: 0 auto 24px; border-radius: 2px;
+  box-shadow: 0 0 12px rgba(232,184,75,0.6);
+}
+
+/* ── TIMER ──────────────────────────────────────── */
+.timer-big {
+  font-family: var(--font-mono); font-size: 40px; font-weight: 600;
+  color: var(--gold); text-align: center; letter-spacing: 3px;
+  text-shadow: 0 0 20px rgba(232,184,75,0.3);
+  margin-bottom: 10px;
+}
+.timer-warn { color: #ff6060 !important; animation: pulse-red 1s infinite; }
+@keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* ── SONG LIBRARY ───────────────────────────────── */
+.library-list { flex: 1; overflow-y: auto; padding: 8px; }
+.library-list::-webkit-scrollbar { width: 4px; }
+.library-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+.song-item {
+  padding: 9px 12px; border-radius: 7px; margin-bottom: 5px;
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all 0.15s; display: flex; align-items: center; justify-content: space-between;
+  background: rgba(255,255,255,0.02);
+}
+.song-item:hover { border-color: rgba(77,217,232,0.3); background: rgba(77,217,232,0.04); }
+.song-item.active { border-color: var(--cyan); background: rgba(77,217,232,0.08); }
+.song-name { font-size: 13px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.song-del { font-size: 14px; color: var(--muted); background: none; border: none; cursor: pointer; padding: 2px 4px; transition: color 0.15s; }
+.song-del:hover { color: #ff8080; }
+
+/* ── KARAOKE DISPLAY ────────────────────────────── */
+.karaoke-wrap { width: 100%; max-width: 900px; }
+.lyric-row { text-align: center; padding: 5px 0; cursor: pointer; transition: all 0.35s ease; }
+.lyric-row.past { font-size: 16px; color: rgba(255,255,255,0.2); font-weight: 300; }
+.lyric-row.current {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 52px); font-weight: 700;
+  color: #fff; text-shadow: 0 0 60px rgba(232,184,75,0.7), 0 0 20px rgba(232,184,75,0.4);
+  transform: scale(1.04);
+}
+.lyric-row.next { font-size: 20px; color: rgba(255,255,255,0.5); font-weight: 400; }
+.lyric-row.far { font-size: 15px; color: rgba(255,255,255,0.15); font-weight: 300; }
+.lyric-section-tag { font-size: 11px; color: var(--gold); letter-spacing: 3px; text-transform: uppercase; font-family: var(--font-mono); padding: 8px 0 2px; }
+
+.beat-viz { display: flex; gap: 5px; align-items: flex-end; height: 32px; }
+.beat-bar { width: 4px; border-radius: 2px; background: linear-gradient(0deg, var(--gold), var(--cyan)); transition: height 0.15s ease; }
+
+.progress-wrap { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--cyan)); transition: width 0.4s ease; }
+
+/* ── BIBLE MODE ─────────────────────────────────── */
+.verse-out {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3.5vw, 56px);
+  font-weight: 600; color: #fff; line-height: 1.5;
+  max-width: 860px; text-align: center;
+  text-shadow: 0 2px 40px rgba(0,0,0,0.8);
+}
+.verse-ref {
+  margin-top: 28px;
+  font-family: var(--font-mono); font-size: 16px;
+  color: var(--gold); letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(232,184,75,0.5);
+}
+.verse-idle { text-align: center; color: var(--muted); }
+.verse-idle-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.4; }
+.verse-idle-text { font-family: var(--font-display); font-size: 22px; color: rgba(255,255,255,0.25); }
+.verse-idle-sub { font-size: 13px; margin-top: 8px; }
+
+.recent-list { display: flex; flex-direction: column; gap: 5px; }
+.recent-item {
+  padding: 8px 10px; border-radius: 6px;
+  border: 1px solid var(--border); cursor: pointer;
+  font-size: 12px; color: var(--muted); transition: all 0.15s;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.recent-item:hover { border-color: rgba(232,184,75,0.3); color: var(--text); }
+
+.version-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.version-btn {
+  padding: 4px 10px; border-radius: 5px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-size: 11px;
+  cursor: pointer; transition: all 0.15s; font-family: var(--font-mono);
+}
+.version-btn.active { border-color: rgba(232,184,75,0.4); color: var(--gold); background: rgba(232,184,75,0.08); }
+
+.loading-dots { display: flex; gap: 6px; align-items: center; justify-content: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); animation: dotpulse 1.2s infinite ease-in-out; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotpulse { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+/* ── BG IMAGE ───────────────────────────────────── */
+.bg-thumb {
+  width: 100%; height: 60px; border-radius: 7px; overflow: hidden;
+  border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--muted); position: relative; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.bg-thumb:hover { border-color: rgba(232,184,75,0.3); }
+.bg-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.bg-clear { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6); border: none; border-radius: 4px; color: #fff; font-size: 11px; cursor: pointer; padding: 2px 6px; }
+
+/* ── FULLSCREEN ─────────────────────────────────── */
+.fs-stage {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #000; display: flex; align-items: center; justify-content: center;
+}
+.fs-exit {
+  position: fixed; top: 16px; right: 16px; z-index: 10000;
+  background: rgba(0,0,0,0.7); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  font-family: var(--font-body); font-size: 13px;
+}
+.fs-exit:hover { background: rgba(255,255,255,0.15); }
+
+/* ── MISC ───────────────────────────────────────── */
+.scroll-area { overflow-y: auto; flex: 1; }
+.scroll-area::-webkit-scrollbar { width: 4px; }
+.scroll-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+.gap6 { display: flex; flex-direction: column; gap: 6px; }
+.gap8 { display: flex; flex-direction: column; gap: 8px; }
+.gap12 { display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; gap: 6px; align-items: center; }
+.flex1 { flex: 1; }
+.mt8 { margin-top: 8px; }
+.mt12 { margin-top: 12px; }
+.small { font-size: 12px; color: var(--muted); }
+.divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+input[type=range] { accent-color: var(--gold); flex: 1; }
+.range-val { font-family: var(--font-mono); font-size: 12px; color: var(--gold); min-width: 20px; }
+`;
+
+// ── DEFAULT DATA ─────────────────────────────────────────
+const DEF_SLIDES = [
+  { id: 1, title: "Welcome", body: "Welcome to Sunday Service\nWe are glad you are here", notes: "Greet congregation warmly." },
+  { id: 2, title: "Announcements", body: "• Bible Study — Wednesday 7PM\n• Prayer Meeting — Friday 6PM\n• Youth Group — Saturday 3PM", notes: "Remind about midweek events." },
+  { id: 3, title: "Today's Scripture", body: "\"For God so loved the world that He gave\nHis one and only Son.\"\n— John 3:16", notes: "Pause here. Let it sink in." },
+  { id: 4, title: "Sermon", body: "Walking in Faith\nPastor's Message", notes: "Hand over to Pastor now." },
+];
+
+const DEF_SONGS = [
+  { id: 1, title: "Amazing Grace", lyrics: `[Verse 1]\nAmazing grace how sweet the sound\nThat saved a wretch like me\nI once was lost but now am found\nWas blind but now I see\n\n[Verse 2]\n'Twas grace that taught my heart to fear\nAnd grace my fears relieved\nHow precious did that grace appear\nThe hour I first believed\n\n[Chorus]\nMy chains are gone I've been set free\nMy God my Savior has ransomed me\nAnd like a flood His mercy reigns\nUnending love amazing grace` },
+  { id: 2, title: "How Great Thou Art", lyrics: `[Verse 1]\nO Lord my God when I in awesome wonder\nConsider all the worlds Thy hands have made\nI see the stars I hear the rolling thunder\nThy power throughout the universe displayed\n\n[Chorus]\nThen sings my soul my Savior God to Thee\nHow great Thou art how great Thou art\nThen sings my soul my Savior God to Thee\nHow great Thou art how great Thou art` },
+];
+
+const VERSIONS = ["web", "kjv", "asv", "bbe"];
+
+// ── DISPLAY COMPONENT (shared for fullscreen) ──────────────
+function DisplayPane({ bg, children, badge }) {
+  return (
+    <div className="display-area">
+      {bg && <><div className="display-bg" style={{ backgroundImage: `url(${bg})` }} /><div className="display-bg-overlay" /></>}
+      <div className="display-content">{children}</div>
+      {badge && <div className="slide-badge">{badge}</div>}
+    </div>
+  );
+}
+
+// ── MAIN APP ─────────────────────────────────────────────
+export default function StageApp() {
+  const [mode, setMode] = useState("presentation");
+
+  // ── Presentation
+  const [slides, setSlides] = useState(DEF_SLIDES);
+  const [curSlide, setCurSlide] = useState(0);
+  const [presNotes, setPresNotes] = useState(DEF_SLIDES[0].notes);
+  const [presBg, setPresBg] = useState(null);
+  const [timerSec, setTimerSec] = useState(0);
+  const [timerOn, setTimerOn] = useState(false);
+  const timerRef = useRef(null);
+
+  // ── Music
+  const [songs, setSongs] = useState(DEF_SONGS);
+  const [curSong, setCurSong] = useState(DEF_SONGS[0]);
+  const [songTitle, setSongTitle] = useState(DEF_SONGS[0].title);
+  const [lyricsText, setLyricsText] = useState(DEF_SONGS[0].lyrics);
+  const [speed, setSpeed] = useState(3);
+  const [playing, setPlaying] = useState(false);
+  const [lyricIdx, setLyricIdx] = useState(0);
+  const [musicBg, setMusicBg] = useState(null);
+  const [beats, setBeats] = useState([20, 35, 15, 45, 25, 30, 20, 40]);
+  const lyricRef = useRef(null);
+  const beatRef = useRef(null);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
+
+  // ── Bible
+  const [bibleQuery, setBibleQuery] = useState("John 3:16");
+  const [bibleVersion, setBibleVersion] = useState("web");
+  const [bibleVerse, setBibleVerse] = useState(null);
+  const [bibleLoading, setBibleLoading] = useState(false);
+  const [bibleError, setBibleError] = useState("");
+  const [recentVerses, setRecentVerses] = useState([]);
+  const [bibleBg, setBibleBg] = useState(null);
+
+  // ── Fullscreen
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // ─── Load song library from storage
+  useEffect(() => {
+    async function load() {
+      try {
+        const r = await window.storage.get("stage-songs");
+        if (r && r.value) {
+          const saved = JSON.parse(r.value);
+          if (Array.isArray(saved) && saved.length) setSongs(saved);
+        }
+      } catch {}
+      setLibraryLoaded(true);
+    }
+    load();
+  }, []);
+
+  // ─── Save songs to storage whenever they change
+  useEffect(() => {
+    if (!libraryLoaded) return;
+    window.storage.set("stage-songs", JSON.stringify(songs)).catch(() => {});
+  }, [songs, libraryLoaded]);
+
+  // ─── Timer
+  useEffect(() => {
+    if (timerOn) timerRef.current = setInterval(() => setTimerSec(s => s + 1), 1000);
+    else clearInterval(timerRef.current);
+    return () => clearInterval(timerRef.current);
+  }, [timerOn]);
+
+  const fmt = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  // ─── Slide helpers
+  const goSlide = i => { setCurSlide(i); setPresNotes(slides[i]?.notes || ""); };
+  const updateSlide = (f, v) => setSlides(sl => sl.map((s, i) => i === curSlide ? { ...s, [f]: v } : s));
+  const addSlide = () => {
+    const ns = { id: Date.now(), title: `Slide ${slides.length + 1}`, body: "Your content here", notes: "" };
+    setSlides(s => [...s, ns]);
+  };
+  const delSlide = () => {
+    if (slides.length <= 1) return;
+    const next = slides.filter((_, i) => i !== curSlide);
+    setSlides(next);
+    setCurSlide(Math.min(curSlide, next.length - 1));
+  };
+
+  // ─── Karaoke helpers
+  const parsedLines = lyricsText.split("\n").map(l => l.trim());
+
+  const startKaraoke = () => {
+    if (playing) {
+      setPlaying(false);
+      clearInterval(lyricRef.current);
+      clearInterval(beatRef.current);
+      return;
+    }
+    setPlaying(true);
+    setLyricIdx(0);
+    const ms = Math.max(700, 4500 - speed * 550);
+    lyricRef.current = setInterval(() => {
+      setLyricIdx(i => {
+        if (i >= parsedLines.length - 1) {
+          setPlaying(false);
+          clearInterval(lyricRef.current);
+          clearInterval(beatRef.current);
+          return i;
+        }
+        return i + 1;
+      });
+    }, ms);
+    beatRef.current = setInterval(() => {
+      setBeats(Array.from({ length: 8 }, () => Math.random() * 28 + 4));
+    }, 200);
+  };
+
+  useEffect(() => () => { clearInterval(lyricRef.current); clearInterval(beatRef.current); }, []);
+
+  const loadSong = song => {
+    setPlaying(false);
+    clearInterval(lyricRef.current);
+    clearInterval(beatRef.current);
+    setCurSong(song);
+    setSongTitle(song.title);
+    setLyricsText(song.lyrics);
+    setLyricIdx(0);
+  };
+
+  const saveSong = () => {
+    const existing = songs.find(s => s.title.toLowerCase() === songTitle.toLowerCase());
+    if (existing) {
+      setSongs(s => s.map(x => x.id === existing.id ? { ...x, lyrics: lyricsText } : x));
+    } else {
+      setSongs(s => [...s, { id: Date.now(), title: songTitle, lyrics: lyricsText }]);
+    }
+  };
+
+  const deleteSong = id => setSongs(s => s.filter(x => x.id !== id));
+
+  // ─── Bible fetch
+  const fetchVerse = async (ref) => {
+    if (!ref.trim()) return;
+    setBibleLoading(true);
+    setBibleError("");
+    setBibleVerse(null);
+    try {
+      const r = await fetch(`https://bible-api.com/${encodeURIComponent(ref)}?translation=${bibleVersion}`);
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      const verse = { text: d.text.trim(), reference: d.reference };
+      setBibleVerse(verse);
+      setRecentVerses(rv => {
+        const filtered = rv.filter(x => x.reference !== verse.reference);
+        return [verse, ...filtered].slice(0, 8);
+      });
+    } catch (e) {
+      setBibleError("Verse not found. Try: John 3:16 or Romans 8:28");
+    }
+    setBibleLoading(false);
+  };
+
+  // ─── Background image upload
+  const handleBgUpload = (setter) => (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setter(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  // ─── Lyric classes
+  const lClass = i => {
+    const d = i - lyricIdx;
+    if (d < 0) return "lyric-row past";
+    if (d === 0) return "lyric-row current";
+    if (d === 1) return "lyric-row next";
+    return "lyric-row far";
+  };
+
+  const visLines = parsedLines.map((l, i) => ({ l, i })).filter(({ i }) => {
+    const d = i - lyricIdx;
+    return d >= -2 && d <= 5;
+  });
+
+  const isSection = l => l.startsWith("[") && l.endsWith("]");
+  const progress = parsedLines.length > 1 ? (lyricIdx / (parsedLines.length - 1)) * 100 : 0;
+
+  // ─── Fullscreen display content
+  const renderDisplay = () => {
+    if (mode === "presentation") {
+      const sl = slides[curSlide] || {};
+      return (
+        <DisplayPane bg={presBg} badge={`${curSlide + 1} / ${slides.length}`}>
+          {sl.title && <div className="slide-title-out">{sl.title}</div>}
+          {sl.title && sl.body && <div className="slide-gold-line" />}
+          {sl.body && <div className="slide-body-out">{sl.body}</div>}
+        </DisplayPane>
+      );
+    }
+    if (mode === "music") {
+      return (
+        <DisplayPane bg={musicBg}>
+          <div className="karaoke-wrap">
+            {visLines.map(({ l, i }) => (
+              isSection(l)
+                ? <div key={i} className="lyric-section-tag">{l.slice(1, -1)}</div>
+                : <div key={i} className={lClass(i)} onClick={() => setLyricIdx(i)}>{l || "\u00a0"}</div>
+            ))}
+          </div>
+        </DisplayPane>
+      );
+    }
+    if (mode === "bible") {
+      return (
+        <DisplayPane bg={bibleBg}>
+          {bibleLoading && <div className="loading-dots"><div className="dot"/><div className="dot"/><div className="dot"/></div>}
+          {bibleVerse && !bibleLoading && (
+            <>
+              <div className="verse-out">"{bibleVerse.text}"</div>
+              <div className="verse-ref">— {bibleVerse.reference}</div>
+            </>
+          )}
+          {!bibleVerse && !bibleLoading && (
+            <div className="verse-idle">
+              <div className="verse-idle-icon">✝</div>
+              <div className="verse-idle-text">Search a Bible verse</div>
+              <div className="verse-idle-sub">Type a reference and press Enter</div>
+            </div>
+          )}
+        </DisplayPane>
+      );
+    }
+  };
+
+  const BgUploader = ({ bg, setter, label }) => (
+    <div className="gap6">
+      <div className="section-label">{label || "Background Image"}</div>
+      <label className="bg-thumb" style={{ cursor: "pointer" }}>
+        {bg ? <><img src={bg} alt="bg" /><button className="bg-clear" onClick={e => { e.preventDefault(); setter(null); }}>✕</button></> : <span>+ Upload Image</span>}
+        <input type="file" accept="image/*" style={{ display: "none" }} onChange={handleBgUpload(setter)} />
+      </label>
+    </div>
+  );
+
+  return (
+    <>
+      <style>{css}</style>
+      <div className="app">
+
+        {/* ── FULLSCREEN OVERLAY ── */}
+        {fullscreen && (
+          <>
+            <div className="fs-stage">{renderDisplay()}</div>
+            <button className="fs-exit" onClick={() => setFullscreen(false)}>✕ Exit Fullscreen</button>
+          </>
+        )}
+
+        {/* ── HEADER ── */}
+        <div className="header">
+          <div className="logo">STAGE</div>
+          <div className="tabs">
+            {["presentation","music","bible"].map(m => (
+              <button key={m} className={`tab ${mode===m?"active":""}`} onClick={() => setMode(m)}>
+                {m === "presentation" ? "⬛ Presentation" : m === "music" ? "♪ Music" : "✝ Bible"}
+              </button>
+            ))}
+          </div>
+          <div className="header-right">
+            <button className="icon-btn" title="Fullscreen / Projector Output" onClick={() => setFullscreen(true)}>⛶</button>
+          </div>
+        </div>
+
+        {/* ══════════════════════════════ PRESENTATION MODE */}
+        {mode === "presentation" && (
+          <div className="content">
+            {/* Left — Slide List */}
+            <div className="left-panel">
+              <div className="panel-section">
+                <div className="section-label">Slides</div>
+                <div className="btn-row">
+                  <button className="btn flex1" onClick={addSlide}>+ Add</button>
+                  <button className="btn danger" onClick={delSlide}>Delete</button>
+                </div>
+              </div>
+              <div className="slide-list">
+                {slides.map((sl, i) => (
+                  <div key={sl.id} className={`slide-item ${i===curSlide?"active":""}`} onClick={() => goSlide(i)}>
+                    <div className="slide-item-num">#{String(i+1).padStart(2,"0")}</div>
+                    <div className="slide-item-title">{sl.title || "Untitled"}</div>
+                    <div className="slide-item-preview">{sl.body?.split("\n")[0]}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Centre — Stage */}
+            <div className="stage">
+              {renderDisplay()}
+              <div className="stage-controls-bar">
+                <button className="btn" onClick={() => goSlide(Math.max(0, curSlide-1))}>← Prev</button>
+                <span className="small" style={{ minWidth: 70, textAlign: "center" }}>{curSlide+1} / {slides.length}</span>
+                <button className="btn gold" onClick={() => goSlide(Math.min(slides.length-1, curSlide+1))}>Next →</button>
+                <div style={{ flex: 1 }} />
+                <button className="btn" onClick={() => setFullscreen(true)}>⛶ Projector</button>
+              </div>
+            </div>
+
+            {/* Right — Controls */}
+            <div className="right-panel">
+              <div className="panel-section">
+                <div className="section-label">Timer</div>
+                <div className={`timer-big ${timerSec > 3600 ? "timer-warn" : ""}`}>{fmt(timerSec)}</div>
+                <div className="btn-row">
+                  <button className={`btn flex1 ${timerOn ? "gold" : ""}`} onClick={() => setTimerOn(!timerOn)}>{timerOn ? "⏸ Pause" : "▶ Start"}</button>
+                  <button className="btn" onClick={() => { setTimerSec(0); setTimerOn(false); }}>↺</button>
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">Edit Slide</div>
+                <div className="gap8">
+                  <input className="inp" value={slides[curSlide]?.title||""} onChange={e => updateSlide("title", e.target.value)} placeholder="Title..." />
+                  <textarea className="inp" rows={4} value={slides[curSlide]?.body||""} onChange={e => updateSlide("body", e.target.value)} placeholder="Content..." />
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <BgUploader bg={presBg} setter={setPresBg} label="Slide Background" />
+              </div>
+
+              <div className="panel-section" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                <div className="section-label">Speaker Notes</div>
+                <textarea className="inp flex1" style={{ flex: 1, resize: "none" }} value={presNotes}
+                  onChange={e => { setPresNotes(e.target.value); updateSlide("notes", e.target.value); }}
+                  placeholder="Private notes for this slide..." />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════ MUSIC MODE */}
+        {mode === "music" && (
+          <div className="content">
+            {/* Left — Library + Editor */}
+            <div className="left-panel">
+              <div className="panel-section">
+                <div className="section-label">Song Library</div>
+                <div className="btn-row mt8">
+                  <button className="btn gold flex1" onClick={saveSong}>💾 Save Song</button>
+                </div>
+              </div>
+              <div className="library-list">
+                {songs.map(s => (
+                  <div key={s.id} className={`song-item ${curSong?.id===s.id?"active":""}`} onClick={() => loadSong(s)}>
+                    <span className="song-name">{s.title}</span>
+                    <button className="song-del" onClick={e => { e.stopPropagation(); deleteSong(s.id); }}>✕</button>
+                  </div>
+                ))}
+              </div>
+              <div className="panel-section">
+                <div className="section-label">Current Song</div>
+                <div className="gap8">
+                  <input className="inp" value={songTitle} onChange={e => setSongTitle(e.target.value)} placeholder="Song title..." />
+                  <textarea className="inp" rows={8} value={lyricsText} onChange={e => setLyricsText(e.target.value)}
+                    placeholder={"Paste lyrics...\nUse [Verse 1], [Chorus] for sections"} />
+                </div>
+              </div>
+            </div>
+
+            {/* Centre — Karaoke Stage */}
+            <div className="stage">
+              {renderDisplay()}
+              <div className="stage-controls-bar">
+                <button className={`btn large ${playing ? "danger" : "gold"}`} onClick={startKaraoke}>
+                  {playing ? "⏹ Stop" : "▶ Start"}
+                </button>
+                {playing && (
+                  <>
+                    <button className="btn" onClick={() => setLyricIdx(i => Math.max(0, i-1))}>↑</button>
+                    <button className="btn" onClick={() => setLyricIdx(i => Math.min(parsedLines.length-1, i+1))}>↓</button>
+                    <div className="progress-wrap"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>
+                    <div className="beat-viz">{beats.map((h, i) => <div key={i} className="beat-bar" style={{ height: h }} />)}</div>
+                  </>
+                )}
+                <div style={{ flex: 1 }} />
+                <button className="btn" onClick={() => setFullscreen(true)}>⛶ Projector</button>
+              </div>
+            </div>
+
+            {/* Right — Settings */}
+            <div className="right-panel">
+              <div className="panel-section">
+                <div className="section-label">Scroll Speed</div>
+                <div className="row mt8">
+                  <span className="small">Slow</span>
+                  <input type="range" min="1" max="7" value={speed} onChange={e => setSpeed(Number(e.target.value))} />
+                  <span className="small">Fast</span>
+                  <span className="range-val">{speed}</span>
+                </div>
+              </div>
+              <div className="panel-section">
+                <BgUploader bg={musicBg} setter={setMusicBg} label="Stage Background" />
+              </div>
+              <div className="panel-section">
+                <div className="section-label">Tips</div>
+                <div className="gap6" style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.75 }}>
+                  <div>• Use [Verse 1], [Chorus] labels</div>
+                  <div>• Blank lines = natural pause</div>
+                  <div>• Click any line to jump to it</div>
+                  <div>• Save songs to library for reuse</div>
+                  <div>• Hit Projector for fullscreen output</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════ BIBLE MODE */}
+        {mode === "bible" && (
+          <div className="content">
+            {/* Left — Search */}
+            <div className="left-panel">
+              <div className="panel-section">
+                <div className="section-label">Bible Translation</div>
+                <div className="version-tabs mt8">
+                  {VERSIONS.map(v => (
+                    <button key={v} className={`version-btn ${bibleVersion===v?"active":""}`} onClick={() => setBibleVersion(v)}>
+                      {v.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">Search Verse</div>
+                <div className="gap8 mt8">
+                  <input className="inp" value={bibleQuery}
+                    onChange={e => setBibleQuery(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && fetchVerse(bibleQuery)}
+                    placeholder="e.g. John 3:16" />
+                  <button className="btn gold full large" onClick={() => fetchVerse(bibleQuery)}>
+                    {bibleLoading ? "Searching..." : "Search"}
+                  </button>
+                  {bibleError && <div style={{ fontSize: 12, color: "#ff8080" }}>{bibleError}</div>}
+                </div>
+              </div>
+
+              <div className="panel-section">
+                <div className="section-label">Quick Verses</div>
+                <div className="recent-list mt8">
+                  {["John 3:16","Psalm 23:1","Romans 8:28","Philippians 4:13","Proverbs 3:5","Isaiah 40:31","Matthew 28:19","Jeremiah 29:11"].map(v => (
+                    <div key={v} className="recent-item" onClick={() => { setBibleQuery(v); fetchVerse(v); }}>
+                      <span>{v}</span><span>→</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {recentVerses.length > 0 && (
+                <div className="panel-section">
+                  <div className="section-label">Recent</div>
+                  <div className="recent-list mt8">
+                    {recentVerses.map((v, i) => (
+                      <div key={i} className="recent-item" onClick={() => setBibleVerse(v)}>
+                        <span>{v.reference}</span><span>→</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Centre — Verse Display */}
+            <div className="stage">
+              {renderDisplay()}
+              <div className="stage-controls-bar">
+                {bibleVerse && <span className="small">{bibleVerse.reference} · {bibleVersion.toUpperCase()}</span>}
+                <div style={{ flex: 1 }} />
+                <button className="btn" onClick={() => setFullscreen(true)}>⛶ Projector</button>
+              </div>
+            </div>
+
+            {/* Right — Settings */}
+            <div className="right-panel">
+              <div className="panel-section">
+                <BgUploader bg={bibleBg} setter={setBibleBg} label="Stage Background" />
+              </div>
+              <div className="panel-section">
+                <div className="section-label">Display Tips</div>
+                <div className="gap6" style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.75 }}>
+                  <div>• Press Enter to search quickly</div>
+                  <div>• Click quick verses for instant display</div>
+                  <div>• Recent verses stay for the session</div>
+                  <div>• Hit Projector for fullscreen</div>
+                  <div>• Translations: WEB, KJV, ASV, BBE</div>
+                </div>
+              </div>
+              <div className="panel-section">
+                <div className="section-label">About Translations</div>
+                <div className="gap6" style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.75 }}>
+                  <div><b style={{ color: "var(--gold)" }}>WEB</b> — World English Bible</div>
+                  <div><b style={{ color: "var(--gold)" }}>KJV</b> — King James Version</div>
+                  <div><b style={{ color: "var(--gold)" }}>ASV</b> — American Standard</div>
+                  <div><b style={{ color: "var(--gold)" }}>BBE</b> — Bible in Basic English</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </>
+  );
+}
